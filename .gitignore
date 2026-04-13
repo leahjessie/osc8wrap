@@ -5,3 +5,4 @@ osc8wrap-replay
 dist/
 .env
 .envrc
+tmp/
