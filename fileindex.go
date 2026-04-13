@@ -97,16 +97,14 @@ func (idx *FileIndex) Wait(ctx context.Context) error {
 
 func (idx *FileIndex) Resolve(path string) string {
 	idx.mu.RLock()
-	ready := idx.ready
-	idx.mu.RUnlock()
-	if !ready {
+	defer idx.mu.RUnlock()
+
+	if !idx.ready {
 		return ""
 	}
 
 	basename := filepath.Base(path)
-	idx.mu.RLock()
 	candidates := idx.files[basename]
-	idx.mu.RUnlock()
 
 	if len(candidates) == 0 {
 		return ""
