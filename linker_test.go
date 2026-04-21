@@ -1185,3 +1185,86 @@ func TestLinker_SymbolLinksWithFilePaths(t *testing.T) {
 		testFile+":10: undefined: \x1b[31mNewLinker\x1b[0m\n",
 		"\x1b]8;;cursor://file"+testFile+":10\x1b\\"+testFile+":10\x1b]8;;\x1b\\: undefined: \x1b[31m\x1b]8;;cursor://maaashjp.symbol-opener?symbol=NewLinker&cwd="+tmpDir+"\x1b\\NewLinker\x1b]8;;\x1b\\\x1b[0m\n")
 }
+
+func TestLinker_MalformedOSC8Stripped(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpDir, "models", "dr"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	userFile := filepath.Join(tmpDir, "models", "dr", "dr_users.go")
+	if err := os.WriteFile(userFile, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tmpDir, _ = filepath.EvalSymlinks(tmpDir)
+	userFile, _ = filepath.EvalSymlinks(userFile)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "schemeless relative URI is stripped and re-linked",
+			input:    "see \x1b]8;;models/dr/dr_users.go\x1b\\models/dr/dr_users.go:1108\x1b]8;;\x1b\\ for details\n",
+			expected: "see \x1b]8;;cursor://file" + userFile + ":1108\x1b\\models/dr/dr_users.go:1108\x1b]8;;\x1b\\ for details\n",
+		},
+		{
+			name:     "schemeless with id param is stripped and re-linked",
+			input:    "see \x1b]8;id=abc;models/dr/dr_users.go\x1b\\models/dr/dr_users.go:1108\x1b]8;;\x1b\\\n",
+			expected: "see \x1b]8;;cursor://file" + userFile + ":1108\x1b\\models/dr/dr_users.go:1108\x1b]8;;\x1b\\\n",
+		},
+		{
+			name:     "valid file:// URI passes through untouched",
+			input:    "see \x1b]8;;file:///tmp/existing\x1b\\shown\x1b]8;;\x1b\\\n",
+			expected: "see \x1b]8;;file:///tmp/existing\x1b\\shown\x1b]8;;\x1b\\\n",
+		},
+		{
+			name:     "valid https URI passes through untouched",
+			input:    "see \x1b]8;;https://example.com\x1b\\shown\x1b]8;;\x1b\\\n",
+			expected: "see \x1b]8;;https://example.com\x1b\\shown\x1b]8;;\x1b\\\n",
+		},
+		{
+			name:     "schemeless with SGR inside is stripped, SGR preserved, path re-linked",
+			input:    "\x1b]8;;models/dr/dr_users.go\x1b\\\x1b[34mmodels/dr/dr_users.go:1108\x1b[39m\x1b]8;;\x1b\\\n",
+			expected: "\x1b[34m\x1b]8;;cursor://file" + userFile + ":1108\x1b\\models/dr/dr_users.go:1108\x1b]8;;\x1b\\\x1b[39m\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			linker := NewLinker(LinkerOptions{
+				Output:   &buf,
+				Cwd:      tmpDir,
+				Hostname: "testhost",
+				Scheme:   "cursor",
+				Domains:  []string{"github.com"},
+			})
+			assertWrite(t, linker, tt.input, tt.expected)
+		})
+	}
+}
+
+func TestHasURIScheme(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		{"file:///path", true},
+		{"https://example.com", true},
+		{"cursor://file/path", true},
+		{"mailto:a@b", true},
+		{"x+y-z.1:foo", true},
+		{"models/dr/dr_users.go", false},
+		{"/absolute/path", false},
+		{"./relative", false},
+		{"", false},
+		{":missing-scheme", false},
+		{"1http://no", false},
+	}
+	for _, tt := range tests {
+		if got := hasURIScheme([]byte(tt.uri)); got != tt.want {
+			t.Errorf("hasURIScheme(%q) = %v, want %v", tt.uri, got, tt.want)
+		}
+	}
+}

@@ -18,8 +18,9 @@ const (
 type Token struct {
 	Kind   TokenKind
 	Data   []byte
-	Styled bool // TokenSGR: true if styling remains active after this token
-	IsEnd  bool // TokenOSC8: true if this is a link-closing sequence (empty URI)
+	Styled bool   // TokenSGR: true if styling remains active after this token
+	IsEnd  bool   // TokenOSC8: true if this is a link-closing sequence (empty URI)
+	URI    []byte // TokenOSC8: the URI portion of the hyperlink (empty for IsEnd). e.g. for "\x1b]8;;file:///tmp/a\x1b\\" URI is "file:///tmp/a"; for "\x1b]8;id=foo;https://x\x1b\\" URI is "https://x".
 }
 
 type state int
@@ -263,9 +264,9 @@ func (t *AnsiTokenizer) emitOSC() Token {
 	data := t.copyBuf()
 
 	oscData := extractOSCData(data)
-	if isEnd, ok := parseOSC8(oscData); ok {
+	if isEnd, uri, ok := parseOSC8(oscData); ok {
 		t.inOSC8 = !isEnd
-		return Token{Kind: TokenOSC8, Data: data, IsEnd: isEnd}
+		return Token{Kind: TokenOSC8, Data: data, IsEnd: isEnd, URI: uri}
 	}
 
 	return Token{Kind: TokenOSC, Data: data}
@@ -440,14 +441,26 @@ func parseNumber(s []byte) int {
 	return n
 }
 
-func parseOSC8(data []byte) (isEnd bool, ok bool) {
+// parseOSC8 parses an OSC 8 hyperlink payload (the bytes between ESC]
+// and the string terminator, excluding the terminator).
+//
+// Examples (input → isEnd, uri, ok):
+//
+//	"8;;https://example.com"         → false, "https://example.com", true   // link open
+//	"8;id=foo;https://example.com"   → false, "https://example.com", true   // link open with params
+//	"8;;linker.go"       → false, "linker.go", true // malformed (no scheme) but still parses
+//	"8;;"                            → true,  "",                    true   // link close
+//	"8;id=foo;"                      → true,  "",                    true   // link close with params
+//	"0;window title"                 → false, nil,                   false  // not OSC 8
+//	"8;"                             → false, nil,                   false  // malformed: missing URI field
+func parseOSC8(data []byte) (isEnd bool, uri []byte, ok bool) {
 	if !bytes.HasPrefix(data, []byte("8;")) {
-		return false, false
+		return false, nil, false
 	}
 	parts := bytes.SplitN(data, []byte(";"), 3)
 	if len(parts) < 3 {
-		return false, false
+		return false, nil, false
 	}
-	uri := parts[2]
-	return len(uri) == 0, true
+	uri = parts[2]
+	return len(uri) == 0, uri, true
 }

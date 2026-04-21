@@ -397,22 +397,24 @@ func TestParseOSC8(t *testing.T) {
 	tests := []struct {
 		data  string
 		isEnd bool
+		uri   string
 		ok    bool
 	}{
-		{"8;;https://example.com", false, true},
-		{"8;;", true, true},
-		{"8;id=foo;https://example.com", false, true},
-		{"8;id=foo;", true, true},
-		{"0;title", false, false},
-		{"8", false, false},
-		{"8;", false, false},
+		{"8;;https://example.com", false, "https://example.com", true},
+		{"8;;", true, "", true},
+		{"8;id=foo;https://example.com", false, "https://example.com", true},
+		{"8;id=foo;", true, "", true},
+		{"8;;models/dr/dr_users.go", false, "models/dr/dr_users.go", true},
+		{"0;title", false, "", false},
+		{"8", false, "", false},
+		{"8;", false, "", false},
 	}
 
 	for _, tt := range tests {
-		isEnd, ok := parseOSC8([]byte(tt.data))
-		if isEnd != tt.isEnd || ok != tt.ok {
-			t.Errorf("parseOSC8(%q): got (%v, %v), want (%v, %v)",
-				tt.data, isEnd, ok, tt.isEnd, tt.ok)
+		isEnd, uri, ok := parseOSC8([]byte(tt.data))
+		if isEnd != tt.isEnd || ok != tt.ok || string(uri) != tt.uri {
+			t.Errorf("parseOSC8(%q): got (%v, %q, %v), want (%v, %q, %v)",
+				tt.data, isEnd, uri, ok, tt.isEnd, tt.uri, tt.ok)
 		}
 	}
 }

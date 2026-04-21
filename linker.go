@@ -41,6 +41,7 @@ type Linker struct {
 	tokenizer       *AnsiTokenizer
 	styled          bool   // true when inside SGR-styled text; enables symbol linking
 	inOSC8          bool   // true when inside OSC8 hyperlink; disables all processing
+	strippingOSC8   bool   // true when inside a malformed OSC8 we're stripping for re-processing
 	pendingWord     []byte // trailing styled token chars from previous Write, awaiting continuation
 }
 
@@ -145,8 +146,21 @@ func (l *Linker) Write(p []byte) (n int, err error) {
 			l.styled = tok.Styled
 		case TokenOSC8:
 			l.flushPendingWord(&result)
-			result.Write(tok.Data)
-			l.inOSC8 = !tok.IsEnd
+			if tok.IsEnd {
+				if l.strippingOSC8 {
+					l.strippingOSC8 = false
+					continue
+				}
+				result.Write(tok.Data)
+				l.inOSC8 = false
+				continue
+			}
+			if hasURIScheme(tok.URI) {
+				result.Write(tok.Data)
+				l.inOSC8 = true
+			} else {
+				l.strippingOSC8 = true
+			}
 		default:
 			l.flushPendingWord(&result)
 			result.Write(tok.Data)
@@ -171,6 +185,31 @@ func (l *Linker) flushPendingWord(buf *bytes.Buffer) {
 	}
 	buf.Write(l.processTextWithState(l.pendingWord, l.styled, l.inOSC8))
 	l.pendingWord = nil
+}
+
+// hasURIScheme reports whether uri begins with a valid RFC 3986 scheme
+// followed by ':'. A well-formed OSC 8 hyperlink requires an absolute URI,
+// so any link lacking a scheme is treated as malformed and stripped.
+func hasURIScheme(uri []byte) bool {
+	if len(uri) == 0 {
+		return false
+	}
+	c := uri[0]
+	if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+		return false
+	}
+	for i := 1; i < len(uri); i++ {
+		c = uri[i]
+		if c == ':' {
+			return i > 0
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == '+' || c == '-' || c == '.' {
+			continue
+		}
+		return false
+	}
+	return false
 }
 
 func splitTrailingStyledToken(data []byte) (head, tail []byte) {

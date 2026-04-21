@@ -78,7 +78,7 @@ alias codex='osc8wrap --scheme=cursor codex'
 - Runs commands through a PTY, so colors and interactive programs work
 - Supports pipe mode for processing output from other commands
 - Preserves existing ANSI escape sequences (colors, cursor control, etc.)
-- Passes through existing OSC 8 hyperlinks without modification
+- **Rescues broken OSC 8 links**: some tools (notably Claude Code) wrap file references in OSC 8 hyperlinks with schemeless relative URIs like `models/foo.go` — valid-looking markup, but terminals silently refuse to open them, and worse, the broken wrapper prevents terminal-side text detectors from rescuing the path. osc8wrap detects these malformed links, strips the outer wrapper, and re-processes the inner text so the path becomes clickable again. Valid OSC 8 links (with proper schemes like `file://`, `https://`, `cursor://`) pass through untouched.
 
 ### Supported patterns
 
