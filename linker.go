@@ -81,8 +81,8 @@ func NewLinker(opts LinkerOptions) *Linker {
 }
 
 func (l *Linker) buildPattern() *regexp.Regexp {
-	// group 1: https URL
-	pattern := `(https://[^\s<>"'\x60\x00-\x1f\x7f]+)`
+	// group 1: http(s) URL
+	pattern := `(https?://[^\s<>"'\x60\x00-\x1f\x7f]+)`
 
 	// group 2: bare domain URL with boundary (github.com/..., etc.)
 	// boundary is included to prevent file path pattern from matching domain names

@@ -142,6 +142,12 @@ func TestLinker_Write(t *testing.T) {
 			expected: "see \x1b]8;;https://example.com/path\x1b\\https://example.com/path\x1b]8;;\x1b\\ for details\n",
 		},
 		{
+			name:     "http URL",
+			input:    "server at http://localhost:4966\n",
+			cwd:      tmpDir,
+			expected: "server at \x1b]8;;http://localhost:4966\x1b\\http://localhost:4966\x1b]8;;\x1b\\\n",
+		},
+		{
 			name:     "https URL with query params",
 			input:    "see https://example.com/path?foo=bar&baz=qux for details\n",
 			cwd:      tmpDir,
