@@ -393,6 +393,62 @@ func TestLinker_Schemes(t *testing.T) {
 	}
 }
 
+func TestLinker_Host(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.go")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tmpDir, _ = filepath.EvalSymlinks(tmpDir)
+	testFile, _ = filepath.EvalSymlinks(testFile)
+
+	tests := []struct {
+		name     string
+		scheme   string
+		host     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "remote host emits ssh segment",
+			scheme:   "zed",
+			host:     "ssh/mac",
+			input:    testFile + ":42\n",
+			expected: "\x1b]8;;zed://ssh/mac" + testFile + ":42\x1b\\" + testFile + ":42\x1b]8;;\x1b\\\n",
+		},
+		{
+			name:     "empty host defaults to file (backward compatible)",
+			scheme:   "zed",
+			host:     "",
+			input:    testFile + "\n",
+			expected: "\x1b]8;;zed://file" + testFile + "\x1b\\" + testFile + "\x1b]8;;\x1b\\\n",
+		},
+		{
+			name:     "host is ignored for the file scheme",
+			scheme:   "file",
+			host:     "ssh/mac",
+			input:    testFile + "\n",
+			expected: "\x1b]8;;file://" + "testhost" + testFile + "\x1b\\" + testFile + "\x1b]8;;\x1b\\\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			linker := NewLinker(LinkerOptions{
+				Output:   &buf,
+				Cwd:      tmpDir,
+				Hostname: "testhost",
+				Scheme:   tt.scheme,
+				Host:     tt.host,
+				Domains:  []string{"github.com"},
+			})
+
+			assertWrite(t, linker, tt.input, tt.expected)
+		})
+	}
+}
+
 func TestLinker_BareDomains(t *testing.T) {
 	tmpDir := t.TempDir()
 	hostname := "testhost"

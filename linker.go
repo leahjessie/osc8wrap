@@ -17,6 +17,7 @@ type LinkerOptions struct {
 	Cwd             string
 	Hostname        string
 	Scheme          string
+	Host            string // host segment for editor-scheme URLs: "file" (default, local) or e.g. "ssh/mac"
 	Domains         []string
 	ResolveBasename bool
 	ExcludeDirs     []string
@@ -30,6 +31,7 @@ type Linker struct {
 	cwd             string
 	hostname        string
 	scheme          string
+	host            string
 	domains         []string
 	urlPattern      *regexp.Regexp
 	resolveBasename bool
@@ -54,11 +56,16 @@ func NewLinker(opts LinkerOptions) *Linker {
 	if terminator == "" {
 		terminator = "st"
 	}
+	host := opts.Host
+	if host == "" {
+		host = "file"
+	}
 	l := &Linker{
 		output:          opts.Output,
 		cwd:             opts.Cwd,
 		hostname:        opts.Hostname,
 		scheme:          scheme,
+		host:            host,
 		domains:         opts.Domains,
 		resolveBasename: opts.ResolveBasename,
 		index:           NewFileIndex(opts.Cwd, opts.ExcludeDirs),
@@ -404,7 +411,7 @@ func (l *Linker) formatFileURL(absPath, locSuffix string) string {
 	if l.scheme == "file" {
 		return "file://" + l.hostname + absPath
 	}
-	return l.scheme + "://file" + absPath + normalizeLocSuffix(locSuffix)
+	return l.scheme + "://" + l.host + absPath + normalizeLocSuffix(locSuffix)
 }
 
 func normalizeLocSuffix(s string) string {

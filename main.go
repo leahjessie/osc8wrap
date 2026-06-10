@@ -23,6 +23,11 @@ Options:
   --scheme=NAME           URL scheme for file links (default: file)
                           Can also be set via OSC8WRAP_SCHEME env var
                           Examples: file, vscode, cursor, zed
+  --host=HOST             Host segment for editor-scheme URLs (default: file)
+                          Can also be set via OSC8WRAP_HOST env var
+                          file: local files -> {scheme}://file{path}
+                          ssh/NAME: remote files -> {scheme}://ssh/NAME{path}
+                          (only applies when --scheme != file)
   --terminator=TYPE       OSC8 string terminator (default: st)
                           Can also be set via OSC8WRAP_TERMINATOR env var
                           st: ESC \ (ECMA-48 standard)
@@ -84,6 +89,7 @@ func run() int {
 
 func parseArgs(args []string) (opts LinkerOptions, cmdArgs []string) {
 	opts.Scheme = os.Getenv("OSC8WRAP_SCHEME")
+	opts.Host = os.Getenv("OSC8WRAP_HOST")
 	opts.Terminator = os.Getenv("OSC8WRAP_TERMINATOR")
 	opts.Domains = []string{"github.com"}
 	if env := os.Getenv("OSC8WRAP_DOMAINS"); env != "" {
@@ -99,6 +105,8 @@ func parseArgs(args []string) (opts LinkerOptions, cmdArgs []string) {
 	for i, arg := range args {
 		if v, ok := strings.CutPrefix(arg, "--scheme="); ok {
 			opts.Scheme = v
+		} else if v, ok := strings.CutPrefix(arg, "--host="); ok {
+			opts.Host = v
 		} else if v, ok := strings.CutPrefix(arg, "--terminator="); ok {
 			opts.Terminator = v
 		} else if v, ok := strings.CutPrefix(arg, "--domains="); ok {

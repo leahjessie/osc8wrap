@@ -137,6 +137,26 @@ By default, file links use the `file://` scheme. To open files directly in your 
 
 Any scheme name is accepted and will be formatted as `{scheme}://file{path}:{line}:{col}`.
 
+### Remote hosts (`--host`)
+
+The `file` segment in editor-scheme URLs is the **host**, and defaults to `file` (a
+local file). Override it with `--host` (or `OSC8WRAP_HOST`) to point links at a
+file on a remote machine — useful when the command runs over SSH but the editor
+runs on your local machine.
+
+For example, when running Claude Code on a remote box over SSH while Zed runs on
+your laptop, `--scheme=zed --host=ssh/<sshalias>` turns the remote paths Claude
+prints into links that open in your local Zed via its SSH remoting:
+
+```sh
+# on the remote host (reached over SSH); opens files in local Zed
+osc8wrap --scheme=zed --host=ssh/mymini claude
+```
+
+produces `zed://ssh/mymini/abs/path:line:col`. The default `--host=file` is
+unchanged, so existing usage is unaffected. `--host` only applies when
+`--scheme` is not `file`.
+
 ### Symbol links
 
 When using an editor scheme (not `file`), osc8wrap detects symbol names in ANSI-styled text (colored, bold, etc.) and converts them to clickable links that open the symbol definition in your editor.
